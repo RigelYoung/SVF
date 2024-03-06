@@ -8,6 +8,7 @@ Debug+Asserts/
 autoconf/
 tests/result/
 doxygen/
+testcases
 .*
 !.config.in
 !.config.cmake.in
