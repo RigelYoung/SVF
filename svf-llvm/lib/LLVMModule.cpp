@@ -237,7 +237,6 @@ void LLVMModuleSet::createSVFFunction(const Function* func)
             getSVFType(func->getFunctionType())),
         func->isDeclaration(), LLVMUtil::isIntrinsicFun(func),
         func->hasAddressTaken(), func->isVarArg(), new SVFLoopAndDomInfo);
-    svfFunc->setName(func->getName().str());
     svfModule->addFunctionSet(svfFunc);
     if (ExtFun2Annotations.find(func) != ExtFun2Annotations.end())
         svfFunc->setAnnotations(ExtFun2Annotations[func]);
@@ -249,9 +248,7 @@ void LLVMModuleSet::createSVFFunction(const Function* func)
             getSVFType(arg.getType()), svfFunc, arg.getArgNo(),
             LLVMUtil::isArgOfUncalledFunction(&arg));
         // Setting up arg name
-        if (arg.hasName())
-            svfarg->setName(arg.getName().str());
-        else
+        if (!arg.hasName())
             svfarg->setName(std::to_string(arg.getArgNo()));
 
         svfFunc->addArgument(svfarg);
@@ -262,8 +259,6 @@ void LLVMModuleSet::createSVFFunction(const Function* func)
     {
         SVFBasicBlock* svfBB =
             new SVFBasicBlock(getSVFType(bb.getType()), svfFunc);
-        if (bb.hasName())
-            svfBB->setName(bb.getName().str());
         svfFunc->addBasicBlock(svfBB);
         addBasicBlockMap(&bb, svfBB);
         for (const Instruction& inst : bb)
@@ -1214,6 +1209,8 @@ void LLVMModuleSet::setValueAttr(const Value* val, SVFValue* svfvalue)
 {
     SVFValue2LLVMValue[svfvalue] = val;
 
+    if(val->hasName())
+        svfvalue->setName(val->getName().str());
     if (LLVMUtil::isPtrInUncalledFunction(val))
         svfvalue->setPtrInUncalledFunction();
     if (LLVMUtil::isConstDataOrAggData(val))
@@ -1263,8 +1260,28 @@ SVFConstantData* LLVMModuleSet::getSVFConstantData(const ConstantData* cd)
         {
             double dval = 0;
             // TODO: Why only double is considered? What about float?
-            if(cfp->isNormalFP() &&  (&cfp->getValueAPF().getSemantics()== &llvm::APFloatBase::IEEEdouble()))
-                dval =  cfp->getValueAPF().convertToDouble();
+            if (cfp->isNormalFP())
+            {
+                const llvm::fltSemantics& semantics = cfp->getValueAPF().getSemantics();
+                if (&semantics == &llvm::APFloat::IEEEhalf() ||
+                        &semantics == &llvm::APFloat::IEEEsingle() ||
+                        &semantics == &llvm::APFloat::IEEEdouble() ||
+                        &semantics == &llvm::APFloat::IEEEquad() ||
+                        &semantics == &llvm::APFloat::x87DoubleExtended())
+                {
+                    dval = cfp->getValueAPF().convertToDouble();
+                }
+                else
+                {
+                    assert (false && "Unsupported floating point type");
+                    abort();
+                }
+            }
+            else
+            {
+                // other cfp type, like isZero(), isInfinity(), isNegative(), etc.
+                // do nothing
+            }
             svfcd = new SVFConstantFP(getSVFType(cd->getType()), dval);
         }
         else if(SVFUtil::isa<ConstantPointerNull>(cd))
@@ -1274,8 +1291,6 @@ SVFConstantData* LLVMModuleSet::getSVFConstantData(const ConstantData* cd)
         else
             svfcd = new SVFConstantData(getSVFType(cd->getType()));
 
-        if (cd->hasName())
-            svfcd->setName(cd->getName().str());
 
         svfModule->addConstant(svfcd);
         addConstantDataMap(cd,svfcd);

@@ -41,6 +41,7 @@
 #include <llvm/IR/GetElementPtrTypeIterator.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Statepoint.h>
+#include <llvm/IR/Intrinsics.h>
 
 #include <llvm/Analysis/MemoryLocation.h>
 #include <llvm/Analysis/DominanceFrontier.h>
@@ -190,7 +191,7 @@ typedef llvm::IntrinsicInst IntrinsicInst;
 typedef llvm::DbgInfoIntrinsic DbgInfoIntrinsic;
 typedef llvm::DbgVariableIntrinsic DbgVariableIntrinsic;
 typedef llvm::DbgDeclareInst DbgDeclareInst;
-typedef llvm::DbgAddrIntrinsic DbgAddrIntrinsic;
+typedef llvm::DbgInfoIntrinsic DbgInfoIntrinsic;
 typedef llvm::DbgValueInst DbgValueInst;
 typedef llvm::DbgLabelInst DbgLabelInst;
 typedef llvm::VPIntrinsic VPIntrinsic;

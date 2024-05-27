@@ -1,4 +1,4 @@
-//===- IntervalValue.h ----Interval Value for Interval Domain-------------//
+//===- IntervalValue.h ----Interval Value for Abstract Domain-------------//
 //
 //                     SVF: Static Value-Flow Analysis
 //
@@ -31,8 +31,8 @@
 #ifndef Z3_EXAMPLE_IntervalValue_H
 #define Z3_EXAMPLE_IntervalValue_H
 
-#include "AE/Core/AbstractValue.h"
-#include "AE/Core/NumericLiteral.h"
+#include <sstream>
+#include "AE/Core/NumericValue.h"
 
 namespace SVF
 {
@@ -40,41 +40,41 @@ namespace SVF
 /// IntervalValue abstract value
 ///
 /// Implemented as a pair of bounds
-class IntervalValue final : public AbstractValue
+class IntervalValue
 {
 private:
     // Lower bound
-    NumericLiteral _lb;
+    BoundedInt _lb;
 
     // Upper bound
-    NumericLiteral _ub;
+    BoundedInt _ub;
 
     // Invariant: isBottom() <=> _lb = 1 && _ub = 0
 public:
 
-    bool isTop() const override
+    bool isTop() const
     {
         return this->_lb.is_minus_infinity() && this->_ub.is_plus_infinity();
     }
 
-    bool isBottom() const override
+    bool isBottom() const
     {
         return !_ub.geq(_lb);
     }
 
     /// Get minus infinity -oo
-    static NumericLiteral minus_infinity()
+    static BoundedInt minus_infinity()
     {
-        return NumericLiteral::minus_infinity();
+        return BoundedInt::minus_infinity();
     }
 
     /// Get plus infinity +oo
-    static NumericLiteral plus_infinity()
+    static BoundedInt plus_infinity()
     {
-        return NumericLiteral::plus_infinity();
+        return BoundedInt::plus_infinity();
     }
 
-    static bool is_infinite(const NumericLiteral &e)
+    static bool is_infinite(const BoundedInt &e)
     {
         return e.is_infinity();
     }
@@ -92,26 +92,27 @@ public:
     }
 
     /// Create default IntervalValue
-    explicit IntervalValue() : AbstractValue(AbstractValue::IntervalK), _lb(minus_infinity()), _ub(plus_infinity()) {}
+    explicit IntervalValue() : _lb(minus_infinity()), _ub(plus_infinity()) {}
 
     /// Create the IntervalValue [n, n]
-    explicit IntervalValue(s64_t n) : AbstractValue(AbstractValue::IntervalK), _lb(n), _ub(n) {}
+    explicit IntervalValue(s64_t n) : _lb(n), _ub(n) {}
 
     explicit IntervalValue(s32_t n) : IntervalValue((s64_t) n) {}
 
     explicit IntervalValue(u32_t n) : IntervalValue((s64_t) n) {}
 
-    explicit IntervalValue(double n) : IntervalValue((s64_t) n) {}
+    explicit IntervalValue(double n) : _lb(n), _ub(n) {}
 
-    explicit IntervalValue(NumericLiteral n) : IntervalValue(n, n) {}
+    explicit IntervalValue(BoundedInt n) : IntervalValue(n, n) {}
 
     /// Create the IntervalValue [lb, ub]
-    explicit IntervalValue(NumericLiteral lb, NumericLiteral ub) : AbstractValue(AbstractValue::IntervalK),
-        _lb(std::move(lb)), _ub(std::move(ub)) {}
+    explicit IntervalValue(BoundedInt lb, BoundedInt ub) : _lb(std::move(lb)), _ub(std::move(ub)) {}
 
-    explicit IntervalValue(s64_t lb, s64_t ub) : IntervalValue(NumericLiteral(lb), NumericLiteral(ub)) {}
+    explicit IntervalValue(s64_t lb, s64_t ub) : IntervalValue(BoundedInt(lb), BoundedInt(ub)) {}
 
-    explicit IntervalValue(double lb, double ub) : IntervalValue(NumericLiteral((s64_t) lb), NumericLiteral((s64_t) ub)) {}
+    explicit IntervalValue(double lb, double ub) : IntervalValue(BoundedInt(lb), BoundedInt(ub)) {}
+
+    explicit IntervalValue(float lb, float ub) : IntervalValue(BoundedInt(lb), BoundedInt(ub)) {}
 
     explicit IntervalValue(s32_t lb, s32_t ub) : IntervalValue((s64_t) lb, (s64_t) ub) {}
 
@@ -199,49 +200,36 @@ public:
     }
 
     /// Destructor
-    ~IntervalValue() override = default;
-
-    /// Methods for support type inquiry through isa, cast, and dyn_cast:
-    //@{
-    static inline bool classof(const IntervalValue *)
-    {
-        return true;
-    }
-
-    static inline bool classof(const AbstractValue *v)
-    {
-        return v->getAbstractValueKind() == AbstractValue::IntervalK;
-    }
-    //@}
+    ~IntervalValue()  = default;
 
     /// Return the lower bound
-    const NumericLiteral &lb() const
+    const BoundedInt &lb() const
     {
-        assert(!this->isBottom());
+        assert(!this->isBottom() && "bottom interval does not have lower bound");
         return this->_lb;
     }
 
     /// Return the upper bound
-    const NumericLiteral &ub() const
+    const BoundedInt &ub() const
     {
-        assert(!this->isBottom());
+        assert(!this->isBottom() && "bottom interval does not have upper bound");
         return this->_ub;
     }
 
     /// Set the lower bound
-    void setLb(const NumericLiteral &lb)
+    void setLb(const BoundedInt &lb)
     {
         this->_lb = lb;
     }
 
     /// Set the upper bound
-    void setUb(const NumericLiteral &ub)
+    void setUb(const BoundedInt &ub)
     {
         this->_ub = ub;
     }
 
     /// Set the lower bound
-    void setValue(const NumericLiteral &lb, const NumericLiteral &ub)
+    void setValue(const BoundedInt &lb, const BoundedInt &ub)
     {
         this->_lb = lb;
         this->_ub = ub;
@@ -259,11 +247,35 @@ public:
         return _lb.is_infinity() || _ub.is_infinity();
     }
 
+    bool is_int() const
+    {
+        return !is_real();
+    }
+
+    bool is_real() const
+    {
+        bool lb_real = _lb.is_real();
+        bool ub_real = _ub.is_real();
+        return lb_real || ub_real;
+    }
+
     /// Return
     s64_t getNumeral() const
     {
         assert(is_numeral() && "this IntervalValue is not numeral");
         return _lb.getNumeral();
+    }
+
+    s64_t getIntNumeral() const
+    {
+        assert(is_numeral() && "this IntervalValue is not numeral");
+        return _lb.getIntNumeral();
+    }
+
+    double getRealNumeral() const
+    {
+        assert(is_numeral() && "this IntervalValue is not numeral");
+        return _lb.getRealNumeral();
     }
 
     /// Return true if the IntervalValue is a number [num, num]
@@ -286,8 +298,11 @@ public:
         this->_ub = plus_infinity();
     }
 
-    /// Check current IntervalValue is smaller than or equal to the other
-    bool leq(const IntervalValue &other) const
+    /// Determines if the current IntervalValue is fully contained within another IntervalValue.
+    /// Example: this: [2, 3], other: [1, 4] -> returns true
+    /// Note: If the current interval is 'bottom', it is considered contained within any interval.
+    ///       If the other interval is 'bottom', it cannot contain any interval.
+    bool containedWithin(const IntervalValue &other) const
     {
         if (this->isBottom())
         {
@@ -304,8 +319,11 @@ public:
 
     }
 
-    /// Check current IntervalValue is greater than or equal to the other
-    bool geq(const IntervalValue &other) const
+    /// Determines if the current IntervalValue fully contains another IntervalValue.
+    /// Example: this: [1, 4], other: [2, 3] -> returns true
+    /// Note: If the current interval is 'bottom', it is considered to contain any interval.
+    ///       If the other interval is 'bottom', it cannot be contained by any interval.
+    bool contain(const IntervalValue &other) const
     {
         if (this->isBottom())
         {
@@ -318,6 +336,42 @@ public:
         else
         {
             return other._lb.geq(this->_lb) && this->_ub.geq(other._ub);
+        }
+    }
+
+    /// Check the upper bound of this Interval is less than or equal to the lower bound
+    /// e.g. [1, 3] < [3, 5] return true, lhs.ub <= rhs.lb
+    bool leq(const IntervalValue &other) const
+    {
+        if (this->isBottom())
+        {
+            return true;
+        }
+        else if (other.isBottom())
+        {
+            return false;
+        }
+        else
+        {
+            return this->_ub.leq(other._lb);
+        }
+    }
+
+    /// Check the lower bound of this Interval is greater than or equal to the upper bound
+    /// e.g. [3, 5] > [1, 3] return true, lhs.lb >= rhs.ub
+    bool geq(const IntervalValue &other) const
+    {
+        if (this->isBottom())
+        {
+            return true;
+        }
+        else if (other.isBottom())
+        {
+            return false;
+        }
+        else
+        {
+            return this->_lb.geq(other._ub);
         }
     }
 
@@ -335,9 +389,31 @@ public:
         }
         else
         {
-            return this->_lb.equal(other._lb) && this->_ub.equal(other._ub);
-            // TODO: IntervalValueZ3Expr equals
-            // TODO: shall we consider expr and solve.
+            if (this->is_real() && other.is_real())
+            {
+                return this->_lb.equal(other._lb) && this->_ub.equal(other._ub);
+            }
+            else if (this->is_int() && other.is_int())
+            {
+                return this->_lb.equal(other._lb) && this->_ub.equal(other._ub);
+            }
+            else if (this->is_int())
+            {
+                double thislb = this->_lb.getIntNumeral();
+                double thisub = this->_ub.getIntNumeral();
+                double otherlb = other._lb.getRealNumeral();
+                double otherub = other._ub.getRealNumeral();
+                return thislb == otherlb && thisub == otherub;
+            }
+            else
+            {
+                double thislb = this->_lb.getRealNumeral();
+                double thisub = this->_ub.getRealNumeral();
+                double otherlb = other._lb.getIntNumeral();
+                double otherub = other._ub.getIntNumeral();
+                return thislb == otherlb && thisub == otherub;
+            }
+            assert(false && "not implemented");
         }
     }
 
@@ -501,13 +577,13 @@ inline IntervalValue operator*(const IntervalValue &lhs,
     }
     else
     {
-        NumericLiteral ll = lhs.lb() * rhs.lb();
-        NumericLiteral lu = lhs.lb() * rhs.ub();
-        NumericLiteral ul = lhs.ub() * rhs.lb();
-        NumericLiteral uu = lhs.ub() * rhs.ub();
-        std::vector<NumericLiteral> vec{ll, lu, ul, uu};
-        return IntervalValue(NumericLiteral::min(vec),
-                             NumericLiteral::max(vec));
+        BoundedInt ll = lhs.lb() * rhs.lb();
+        BoundedInt lu = lhs.lb() * rhs.ub();
+        BoundedInt ul = lhs.ub() * rhs.lb();
+        BoundedInt uu = lhs.ub() * rhs.ub();
+        std::vector<BoundedDouble> vec{ll, lu, ul, uu};
+        return IntervalValue(BoundedInt::min(vec),
+                             BoundedInt::max(vec));
     }
 }
 
@@ -526,14 +602,14 @@ inline IntervalValue operator/(const IntervalValue &lhs,
     else
     {
         // Neither the dividend nor the divisor contains 0
-        NumericLiteral ll = lhs.lb() / rhs.lb();
-        NumericLiteral lu = lhs.lb() / rhs.ub();
-        NumericLiteral ul = lhs.ub() / rhs.lb();
-        NumericLiteral uu = lhs.ub() / rhs.ub();
-        std::vector<NumericLiteral> vec{ll, lu, ul, uu};
+        BoundedInt ll = lhs.lb() / rhs.lb();
+        BoundedInt lu = lhs.lb() / rhs.ub();
+        BoundedInt ul = lhs.ub() / rhs.lb();
+        BoundedInt uu = lhs.ub() / rhs.ub();
+        std::vector<BoundedDouble> vec{ll, lu, ul, uu};
 
-        return IntervalValue(NumericLiteral::min(vec),
-                             NumericLiteral::max(vec));
+        return IntervalValue(BoundedInt::min(vec),
+                             BoundedInt::max(vec));
     }
 }
 
@@ -555,9 +631,9 @@ inline IntervalValue operator%(const IntervalValue &lhs,
     }
     else
     {
-        NumericLiteral n_ub = max(abs(lhs.lb()), abs(lhs.ub()));
-        NumericLiteral d_ub = max(abs(rhs.lb()), rhs.ub()) - 1;
-        NumericLiteral ub = min(n_ub, d_ub);
+        BoundedInt n_ub = max(abs(lhs.lb()), abs(lhs.ub()));
+        BoundedInt d_ub = max(abs(rhs.lb()), rhs.ub()) - 1;
+        BoundedInt ub = min(n_ub, d_ub);
 
         if (lhs.lb().getNumeral() < 0)
         {
@@ -826,13 +902,13 @@ inline IntervalValue operator>>(const IntervalValue &lhs, const IntervalValue &r
         }
         else
         {
-            NumericLiteral ll = lhs.lb() >> shift.lb();
-            NumericLiteral lu = lhs.lb() >> shift.ub();
-            NumericLiteral ul = lhs.ub() >> shift.lb();
-            NumericLiteral uu = lhs.ub() >> shift.ub();
-            std::vector<NumericLiteral> vec{ll, lu, ul, uu};
-            return IntervalValue(NumericLiteral::min(vec),
-                                 NumericLiteral::max(vec));
+            BoundedInt ll = lhs.lb() >> shift.lb();
+            BoundedInt lu = lhs.lb() >> shift.ub();
+            BoundedInt ul = lhs.ub() >> shift.lb();
+            BoundedInt uu = lhs.ub() >> shift.ub();
+            std::vector<BoundedDouble> vec{ll, lu, ul, uu};
+            return IntervalValue(BoundedInt::min(vec),
+                                 BoundedInt::max(vec));
         }
     }
 }

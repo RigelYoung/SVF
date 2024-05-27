@@ -28,7 +28,7 @@
 // Created by Jiawei Wang on 2024/1/12.
 //
 
-#include "AE/Svfexe/AbstractExecution.h"
+#include "AE/Svfexe/AbstractInterpretation.h"
 
 namespace SVF
 {
@@ -100,27 +100,28 @@ protected:
     const SVFValue* _allocVar;
 };
 
-class BufOverflowCheckerAPI: public AEAPI
+class BufOverflowChecker: public AbstractInterpretation
 {
 public:
-    BufOverflowCheckerAPI() = delete;
-    BufOverflowCheckerAPI(AbstractExecution * ae, AEStat * stat): AEAPI(ae, stat)
+    BufOverflowChecker() : AbstractInterpretation()
     {
         initExtFunMap();
-        initExtAPIBufOverflowCheckRules();
         _kind = AEKind::BufOverflowChecker;
-    }
-    static bool classof(const AEAPI* api)
-    {
-        return api->getKind() == AEKind::BufOverflowChecker;
+        initExtAPIBufOverflowCheckRules();
     }
 
+    static bool classof(const AbstractInterpretation* ae)
+    {
+        return ae->getKind() == AEKind::BufOverflowChecker;
+    }
+
+protected:
     /**
     * the map of external function to its API type
     *
     * it initialize the ext apis about buffer overflow checking
     */
-    virtual void initExtFunMap();
+    virtual void initExtFunMap() override;
 
     /**
     * the map of ext apis of buffer overflow checking rules
@@ -136,7 +137,7 @@ public:
     *
     * @param call call node whose callee is external function
     */
-    void handleExtAPI(const CallICFGNode *call) ;
+    void handleExtAPI(const CallICFGNode *call) override;
     /**
     * detect buffer overflow from strcpy like apis
     * e.g. strcpy(dst, src), if dst is shorter than src, we will throw buffer overflow
@@ -164,31 +165,6 @@ public:
      * @return true if the buffer overflow is detected
      */
     bool canSafelyAccessMemory(const SVFValue *value, const IntervalValue &len, const ICFGNode *curNode);
-
-
-    Map<NodeID, const GepStmt*> _addrToGep;
-    Map<std::string, std::vector<std::pair<u32_t, u32_t>>> _extAPIBufOverflowCheckRules;
-};
-
-class BufOverflowChecker: public AbstractExecution
-{
-    friend BufOverflowCheckerAPI;
-
-public:
-    BufOverflowChecker() : AbstractExecution()
-    {
-        _kind = AEKind::BufOverflowChecker;
-    }
-
-    static bool classof(const AbstractExecution* ae)
-    {
-        return ae->getKind() == AEKind::BufOverflowChecker;
-    }
-
-    void initExtAPI() override
-    {
-        _api = new BufOverflowCheckerAPI(this, _stat);
-    }
 
 private:
     /**
@@ -221,6 +197,9 @@ private:
     */
     void addBugToRecoder(const BufOverflowException& e, const ICFGNode* node);
 
+private:
+    Map<NodeID, const GepStmt*> _addrToGep;
+    Map<std::string, std::vector<std::pair<u32_t, u32_t>>> _extAPIBufOverflowCheckRules;
 
 };
 }

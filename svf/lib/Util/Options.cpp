@@ -847,10 +847,26 @@ const Option<std::string> Options::OutputName(
     "output","output db file","output.db");
 const Option<bool> Options::BufferOverflowCheck(
     "overflow","Buffer Overflow Detection",false);
+const Option<bool> Options::MemoryLeakCheck(
+    "leak", "Memory Leak Detection",false);
+const Option<bool> Options::FileCheck(
+    "fileck", "File Open/Close Detection",false);
+const Option<bool> Options::DFreeCheck(
+    "dfree", "Double Free Detection",false);
+const Option<bool> Options::RaceCheck(
+    "race", "Data race Detection",false);
 const Option<bool> Options::GepUnknownIdx(
     "gep-unknown-idx","Skip Gep Unknown Index",false);
 const Option<bool> Options::RunUncallFuncs(
     "run-uncall-fun","Skip Gep Unknown Index",false);
 const Option<bool> Options::ICFGMergeAdjacentNodes(
     "icfg-merge-adjnodes","ICFG Simplification - Merge Adjacent Nodes in the Same Basic Block.",false);
+
+
+const Option<u32_t> Options::AEPrecision(
+    "precision",
+    "symbolic abstraction precision for float",
+    0
+);
+
 } // namespace SVF.
